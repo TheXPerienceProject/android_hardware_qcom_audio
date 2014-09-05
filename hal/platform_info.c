@@ -70,6 +70,7 @@ typedef enum {
     INPUT_SND_DEVICE_TO_MIC_MAPPING,
     SND_DEV,
     MIC_INFO,
+    DEVICE_NAME,
     CUSTOM_MTMX_PARAMS,
     CUSTOM_MTMX_PARAM_COEFFS,
     EXTERNAL_DEVICE_SPECIFIC,
@@ -96,6 +97,7 @@ static void process_acdb_metainfo_key(const XML_Char **attr);
 static void process_microphone_characteristic(const XML_Char **attr);
 static void process_snd_dev(const XML_Char **attr);
 static void process_mic_info(const XML_Char **attr);
+static void process_device_name(const XML_Char **attr);
 static void process_custom_mtmx_params(const XML_Char **attr);
 static void process_custom_mtmx_param_coeffs(const XML_Char **attr);
 static void process_external_dev(const XML_Char **attr);
@@ -119,6 +121,7 @@ static section_process_fn section_table[] = {
     [MICROPHONE_CHARACTERISTIC] = process_microphone_characteristic,
     [SND_DEV] = process_snd_dev,
     [MIC_INFO] = process_mic_info,
+    [DEVICE_NAME] = process_device_name,
     [CUSTOM_MTMX_PARAMS] = process_custom_mtmx_params,
     [CUSTOM_MTMX_PARAM_COEFFS] = process_custom_mtmx_param_coeffs,
     [EXTERNAL_DEVICE_SPECIFIC] = process_external_dev,
@@ -266,6 +269,12 @@ static struct audio_custom_mtmx_in_params_info mtmx_in_params_info;
  *      ...
  *      ...
  * </config_params>
+ *
+ * <device_names>
+ * <device name="???" alias="???"/>
+ * ...
+ * ...
+ * </device_names>
  *
  * <operator_specific>
  *      <device name="???" operator="???" mixer_path="???" acdb_id="???"/>
@@ -1193,6 +1202,38 @@ static void process_custom_mtmx_params(const XML_Char **attr)
 
 }
 
+static void process_device_name(const XML_Char **attr)
+{
+    int index;
+
+    if (strcmp(attr[0], "name") != 0) {
+        ALOGE("%s: 'name' not found, no alias set!", __func__);
+        goto done;
+    }
+
+    index = platform_get_snd_device_index((char *)attr[1]);
+    if (index < 0) {
+        ALOGE("%s: Device %s in platform info xml not found, no alias set!",
+              __func__, attr[1]);
+        goto done;
+    }
+
+    if (strcmp(attr[2], "alias") != 0) {
+        ALOGE("%s: Device %s in platform info xml has no alias, no alias set!",
+              __func__, attr[1]);
+        goto done;
+    }
+
+    if (platform_set_snd_device_name(index, attr[3]) < 0) {
+        ALOGE("%s: Device %s, alias %s was not set!",
+              __func__, attr[1], attr[3]);
+        goto done;
+    }
+
+done:
+    return;
+}
+
 static void start_tag(void *userdata __unused, const XML_Char *tag_name,
                       const XML_Char **attr)
 {
@@ -1235,6 +1276,8 @@ static void start_tag(void *userdata __unused, const XML_Char *tag_name,
             section = MICROPHONE_CHARACTERISTIC;
         } else if (strcmp(tag_name, "snd_devices") == 0) {
             section = SND_DEVICES;
+        } else if (strcmp(tag_name, "device_names") == 0) {
+            section = DEVICE_NAME;
         } else if (strcmp(tag_name, "device") == 0) {
             if ((section != ACDB) && (section != AEC) && (section != NS) &&
                 (section != BACKEND_NAME) && (section != BITWIDTH) &&
@@ -1427,6 +1470,8 @@ static void end_tag(void *userdata __unused, const XML_Char *tag_name)
         section = SND_DEVICES;
     } else if (strcmp(tag_name, "input_snd_device_mic_mapping") == 0) {
         section = INPUT_SND_DEVICE;
+    } else if (strcmp(tag_name, "device_names") == 0) {
+        section = ROOT;
     } else if (strcmp(tag_name, "custom_mtmx_params") == 0) {
         section = ROOT;
     } else if (strcmp(tag_name, "custom_mtmx_param_coeffs") == 0) {
