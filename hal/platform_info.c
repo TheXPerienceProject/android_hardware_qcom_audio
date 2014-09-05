@@ -963,7 +963,38 @@ static void process_custom_mtmx_params(const XML_Char **attr)
     }
     mtmx_params_info.snd_device = platform_get_snd_device_index((char *)attr[attr_idx++]);
     platform_add_custom_mtmx_params((void *)my_data.platform, &mtmx_params_info);
+}
 
+static void process_device_name(const XML_Char **attr)
+{
+    int index;
+
+    if (strcmp(attr[0], "name") != 0) {
+        ALOGE("%s: 'name' not found, no alias set!", __func__);
+        goto done;
+    }
+
+    index = platform_get_snd_device_index((char *)attr[1]);
+    if (index < 0) {
+        ALOGE("%s: Device %s in platform info xml not found, no alias set!",
+              __func__, attr[1]);
+        goto done;
+    }
+
+    if (strcmp(attr[2], "alias") != 0) {
+        ALOGE("%s: Device %s in platform info xml has no alias, no alias set!",
+              __func__, attr[1]);
+        goto done;
+    }
+
+    if (platform_set_snd_device_name(index, attr[3]) < 0) {
+        ALOGE("%s: Device %s, alias %s was not set!",
+              __func__, attr[1], attr[3]);
+        goto done;
+    }
+
+done:
+    return;
 }
 
 static void process_device_name(const XML_Char **attr)
