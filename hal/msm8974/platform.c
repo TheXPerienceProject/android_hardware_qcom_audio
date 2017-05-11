@@ -472,6 +472,8 @@ static int pcm_device_table[AUDIO_USECASE_MAX][2] = {
                      {PLAYBACK_INTERACTIVE_STRM_DEVICE7, PLAYBACK_INTERACTIVE_STRM_DEVICE7},
     [USECASE_AUDIO_PLAYBACK_INTERACTIVE_STREAM8] =
                      {PLAYBACK_INTERACTIVE_STRM_DEVICE8, PLAYBACK_INTERACTIVE_STRM_DEVICE8},
+    [USECASE_AUDIO_ULTRASOUND_RX] = {ULTRASOUND_PCM_DEVICE, -1},
+    [USECASE_AUDIO_ULTRASOUND_TX] = {-1, ULTRASOUND_PCM_DEVICE},
     [USECASE_AUDIO_EC_REF_LOOPBACK] = {-1, -1}, /* pcm id updated from platform info file */
     [USECASE_AUDIO_PLAYBACK_MEDIA] = {MEDIA_PCM_DEVICE,
                                       MEDIA_PCM_DEVICE},
@@ -584,6 +586,7 @@ static const char * device_table[SND_DEVICE_MAX] = {
     [SND_DEVICE_OUT_BUS_SYS] = "bus-speaker",
     [SND_DEVICE_OUT_BUS_NAV] = "bus-speaker",
     [SND_DEVICE_OUT_BUS_PHN] = "bus-speaker",
+    [SND_DEVICE_OUT_ULTRASOUND_HANDSET] = "ultrasound-handset",
 
     /* Capture sound devices */
     [SND_DEVICE_IN_HANDSET_MIC] = "handset-mic",
@@ -722,6 +725,7 @@ static const char * device_table[SND_DEVICE_MAX] = {
     [SND_DEVICE_IN_HANDSET_QMIC_AND_EC_REF_LOOPBACK] = "handset-qmic-and-ec-ref-loopback",
     [SND_DEVICE_IN_HANDSET_6MIC_AND_EC_REF_LOOPBACK] = "handset-6mic-and-ec-ref-loopback",
     [SND_DEVICE_IN_HANDSET_8MIC_AND_EC_REF_LOOPBACK] = "handset-8mic-and-ec-ref-loopback",
+    [SND_DEVICE_IN_ULTRASOUND_MIC] = "ultrasound-mic",
 };
 
 // Platform specific backend bit width table
@@ -1289,6 +1293,8 @@ static const struct name_to_index usecase_type_index[USECASE_TYPE_MAX] = {
     {TO_NAME_INDEX(PCM_CAPTURE)},
     {TO_NAME_INDEX(VOICE_CALL)},
     {TO_NAME_INDEX(PCM_HFP_CALL)},
+    {TO_NAME_INDEX(USECASE_AUDIO_ULTRASOUND_RX)},
+    {TO_NAME_INDEX(USECASE_AUDIO_ULTRASOUND_TX)},
 };
 
 struct app_type_entry {
@@ -1749,7 +1755,11 @@ bool platform_send_gain_dep_cal(void *platform, int level) {
             usecase = node_to_item(node, struct audio_usecase, list);
 
             if (usecase != NULL && usecase->stream.out &&
-                                   usecase->type == PCM_PLAYBACK) {
+                                   usecase->type == PCM_PLAYBACK
+#ifdef ELLIPTIC_ULTRASOUND_ENABLED
+                && usecase->id != USECASE_AUDIO_ULTRASOUND_RX
+#endif
+                ) {
                 int new_snd_device[2] = {0};
                 int i, num_devices = 1;
 
@@ -2231,6 +2241,7 @@ static void set_platform_defaults(struct platform_data * my_data)
     hw_interface_table[SND_DEVICE_OUT_BUS_SYS] = strdup("TERT_TDM_RX_0");
     hw_interface_table[SND_DEVICE_OUT_BUS_NAV] = strdup("TERT_TDM_RX_1");
     hw_interface_table[SND_DEVICE_OUT_BUS_PHN] = strdup("TERT_TDM_RX_2");
+    hw_interface_table[SND_DEVICE_OUT_ULTRASOUND_HANDSET] = strdup("SLIMBUS_0_RX");
     hw_interface_table[SND_DEVICE_IN_HANDSET_MIC] = strdup("SLIMBUS_0_TX");
     hw_interface_table[SND_DEVICE_IN_HANDSET_MIC_SB] = strdup("SLIMBUS_0_TX");
     hw_interface_table[SND_DEVICE_IN_HANDSET_MIC_EXTERNAL] = strdup("SLIMBUS_0_TX");
@@ -2358,6 +2369,8 @@ static void set_platform_defaults(struct platform_data * my_data)
     hw_interface_table[SND_DEVICE_IN_CAMCORDER_SELFIE_PORTRAIT] = strdup("SLIMBUS_0_TX");
     hw_interface_table[SND_DEVICE_IN_VOICE_HEARING_AID] = strdup("SLIMBUS_0_TX");
     hw_interface_table[SND_DEVICE_IN_BUS] = strdup("TERT_TDM_TX_0");
+    hw_interface_table[SND_DEVICE_IN_ULTRASOUND_MIC] = strdup("SLIMBUS_0_TX");
+
     my_data->max_mic_count = PLATFORM_DEFAULT_MIC_COUNT;
 
      /*remove ALAC & APE from DSP decoder list based on software decoder availability*/

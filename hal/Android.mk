@@ -330,13 +330,19 @@ ifeq ($(strip $(AUDIO_FEATURE_ENABLED_FFV)), true)
     LOCAL_SRC_FILES += audio_extn/ffv.c
 endif
 
+LOCAL_CFLAGS += -D_GNU_SOURCE
+
 # Hardware Specific feature
 ifeq ($(strip $(AUDIO_FEATURE_ENABLED_AHAL_EXT)),true)
     LOCAL_CFLAGS += -DAHAL_EXT_ENABLED
     LOCAL_SHARED_LIBRARIES += vendor.qti.hardware.audiohalext@1.0
 endif
 
-LOCAL_CFLAGS += -D_GNU_SOURCE
+ifeq ($(strip $(AUDIO_FEATURE_ELLIPTIC_ULTRASOUND_SUPPORT)),true)
+    LOCAL_CFLAGS += -DELLIPTIC_ULTRASOUND_ENABLED
+    LOCAL_SRC_FILES += audio_extn/ultrasound.c
+endif
+
 LOCAL_CFLAGS += -Wall -Werror
 LOCAL_CLANG_CFLAGS += -Wno-unused-variable -Wno-unused-function -Wno-missing-field-initializers
 
