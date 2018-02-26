@@ -447,6 +447,11 @@ ifeq ($(strip $(AUDIO_FEATURE_ENABLED_FFV)), true)
     LOCAL_SRC_FILES += audio_extn/ffv.c
 endif
 
+ifeq ($(strip $(AUDIO_FEATURE_ELLIPTIC_ULTRASOUND_SUPPORT)),true)
+    LOCAL_CFLAGS += -DELLIPTIC_ULTRASOUND_ENABLED
+    LOCAL_SRC_FILES += audio_extn/ultrasound.c
+endif
+
 LOCAL_CFLAGS += -D_GNU_SOURCE
 
 ifneq ($(strip $(AUDIO_FEATURE_ENABLED_EXT_AMPLIFIER)),false)
