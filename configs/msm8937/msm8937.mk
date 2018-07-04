@@ -79,6 +79,7 @@ PRODUCT_COPY_FILES +=\
 $(AUDIO_HAL_ROOT)/configs/msm8937/audio_output_policy.conf:$(TARGET_COPY_OUT_VENDOR)/etc/audio_output_policy.conf\
 $(AUDIO_HAL_ROOT)/configs/msm8937/audio_effects.conf:$(TARGET_COPY_OUT_VENDOR)/etc/audio_effects.conf\
 $(AUDIO_HAL_ROOT)/configs/msm8937/mixer_paths_mtp.xml:$(TARGET_COPY_OUT_VENDOR)/etc/mixer_paths_mtp.xml \
+$(AUDIO_HAL_ROOT)/configs/msm8937/mixer_paths_sdm439_pm8953.xml:$(TARGET_COPY_OUT_VENDOR)/etc/mixer_paths_sdm439_pm8953.xml \
 $(AUDIO_HAL_ROOT)/configs/msm8937/mixer_paths_qrd_skuh.xml:$(TARGET_COPY_OUT_VENDOR)/etc/mixer_paths_qrd_skuh.xml \
 $(AUDIO_HAL_ROOT)/configs/msm8937/mixer_paths_qrd_skui.xml:$(TARGET_COPY_OUT_VENDOR)/etc/mixer_paths_qrd_skui.xml \
 $(AUDIO_HAL_ROOT)/configs/msm8937/mixer_paths_qrd_skuhf.xml:$(TARGET_COPY_OUT_VENDOR)/etc/mixer_paths_qrd_skuhf.xml \
