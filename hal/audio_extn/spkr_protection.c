@@ -55,6 +55,7 @@
 #define LOG_MASK HAL_MOD_FILE_SPKR_PROT
 #include <log_utils.h>
 #endif
+#include <pthread.h>
 
 #ifdef SPKR_PROT_ENABLED
 
