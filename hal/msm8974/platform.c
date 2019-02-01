@@ -10630,7 +10630,11 @@ int platform_set_swap_channels(struct audio_device *adev, bool swap_channels)
 
     list_for_each(node, &adev->usecase_list) {
         usecase = node_to_item(node, struct audio_usecase, list);
-        if (usecase->stream.out && usecase->type == PCM_PLAYBACK &&
+
+#ifdef ELLIPTIC_ULTRASOUND_ENABLED
+        if (usecase->id != USECASE_AUDIO_ULTRASOUND_RX)
+#endif
+	if (usecase->stream.out && usecase->type == PCM_PLAYBACK &&
                 usecase->stream.out->devices & AUDIO_DEVICE_OUT_SPEAKER) {
             /*
              * If acdb tuning is different for SPEAKER_REVERSE, it is must
