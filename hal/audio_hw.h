@@ -355,6 +355,8 @@ struct stream_out {
     bool stream_config_changed;
     mix_matrix_params_t pan_scale_params;
     mix_matrix_params_t downmix_params;
+    bool set_dual_mono;
+    bool prev_card_status_offline;
 };
 
 struct stream_in {
@@ -538,6 +540,7 @@ struct audio_device {
     unsigned int interactive_usecase_state;
     bool dp_allowed_for_voice;
     amplifier_device_t *amp;
+    void *ext_hw_plugin;
 };
 
 int select_devices(struct audio_device *adev,

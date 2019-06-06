@@ -4,6 +4,7 @@ AM_CFLAGS = -I ${WORKSPACE}/external/tinyalsa/include \
         -I $(top_srcdir)/hal \
         -I $(top_srcdir)/hal/audio_extn \
         -I $(top_srcdir)/hal/voice_extn \
+        -I $(PKG_CONFIG_SYSROOT_DIR)/usr/include/audio-kernel \
         -I $(top_srcdir)/hal/${TARGET_PLATFORM}
 
 c_sources = audio_hw.c \
@@ -203,6 +204,10 @@ if CUSTOM_STEREO
 AM_CFLAGS += -DCUSTOM_STEREO_ENABLED
 endif
 
+if INSTANCE_ID
+AM_CFLAGS += -DINSTANCE_ID_ENABLED
+endif
+
 h_sources = audio_extn/audio_defs.h \
             audio_extn/audio_extn.h \
             audio_hw.h \
@@ -223,5 +228,5 @@ audio_primary_default_la_CFLAGS += -Dstrlcat=g_strlcat
 audio_primary_default_la_CFLAGS += -DINT_MAX=0x7fffffff
 audio_primary_default_la_CFLAGS += -D__unused=__attribute__\(\(__unused__\)\)
 audio_primary_default_la_CFLAGS += -DLINUX_ENABLED $(TARGET_CFLAGS) -DAUDIO_EXTN_FORMATS_ENABLED
-audio_primary_default_la_CFLAGS += -DNDEBUG
+audio_primary_default_la_CFLAGS += -DNDEBUG -D_GNU_SOURCE
 audio_primary_default_la_LDFLAGS = -module -shared -avoid-version
