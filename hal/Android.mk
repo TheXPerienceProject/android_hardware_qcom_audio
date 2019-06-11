@@ -72,7 +72,7 @@ ifeq ($(TARGET_BOARD_AUTO),true)
   LOCAL_CFLAGS += -DPLATFORM_AUTO
 endif
 
-LOCAL_CFLAGS += -Wno-macro-redefined
+LOCAL_CFLAGS += -Wno-macro-redefined -Wno-unused-parameter
 
 LOCAL_HEADER_LIBRARIES := libhardware_headers
 
