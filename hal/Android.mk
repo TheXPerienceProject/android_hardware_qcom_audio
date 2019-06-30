@@ -500,7 +500,6 @@ endif
 ifeq ($(strip $(AUDIO_FEATURE_ENABLED_A2DP_DECODERS)), true)
     LOCAL_CFLAGS += -DAPTX_DECODER_ENABLED
 endif
->>>>>>> LA.UM.7.4.r1-05300-8x98.0
 
 LOCAL_MODULE := audio.primary.$(TARGET_BOARD_PLATFORM)
 
