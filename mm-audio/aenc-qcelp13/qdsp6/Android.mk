@@ -38,7 +38,9 @@ LOCAL_SHARED_LIBRARIES  := libutils liblog
 LOCAL_SRC_FILES         := src/aenc_svr.c
 LOCAL_SRC_FILES         += src/omx_qcelp13_aenc.cpp
 
-LOCAL_HEADER_LIBRARIES  := generated_kernel_headers
+LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
+LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
+
 
 include $(BUILD_SHARED_LIBRARY)
 
