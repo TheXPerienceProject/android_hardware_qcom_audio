@@ -1,9 +1,9 @@
-ifneq ($(strip $(AUDIO_FEATURE_ENABLED_EXTN_POST_PROC)),false)
+ifeq ($(strip $(AUDIO_FEATURE_ENABLED_EXTN_POST_PROC)),true)
 LOCAL_PATH:= $(call my-dir)
 
 include $(CLEAR_VARS)
 
-ifneq ($(strip $(AUDIO_FEATURE_ENABLED_PROXY_DEVICE)),false)
+ifeq ($(strip $(AUDIO_FEATURE_ENABLED_PROXY_DEVICE)),true)
     LOCAL_CFLAGS += -DAFE_PROXY_ENABLED
 endif
 
@@ -35,8 +35,7 @@ LOCAL_C_INCLUDES := \
 	external/tinyalsa/include \
 	$(call include-path-for, audio-effects)
 
-LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
-LOCAL_ADDITIONAL_DEPENDENCIES := $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
+LOCAL_HEADER_LIBRARIES := generated_kernel_headers
 
 include $(BUILD_SHARED_LIBRARY)
 
