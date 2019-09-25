@@ -324,7 +324,6 @@ ifeq ($(strip $(AUDIO_FEATURE_ENABLED_BT_HAL)),true)
     LOCAL_SRC_FILES += audio_extn/bt_hal.c
 endif
 
-ifeq ($(strip $(USE_LIB_PROCESS_GROUP)),true)
 LOCAL_SHARED_LIBRARIES := \
         liblog \
         libcutils \
@@ -336,17 +335,6 @@ LOCAL_SHARED_LIBRARIES := \
         libexpat \
         libhidltransport \
         libprocessgroup
-else
-LOCAL_SHARED_LIBRARIES := \
-	liblog \
-	libcutils \
-	libhardware \
-	libtinyalsa \
-	libaudioroute \
-	libdl \
-	libaudioutils \
-	libexpat
-endif
 
 ifeq ($(strip $(AUDIO_FEATURE_ENABLED_QAP)),true)
 LOCAL_CFLAGS += -DQAP_EXTN_ENABLED -Wno-tautological-pointer-compare
