@@ -8100,7 +8100,7 @@ static int adev_set_parameters(struct audio_hw_device *dev, const char *kvpairs)
     struct str_parms *parms;
     char value[32];
     int val;
-    int ret;
+    int ret, ret1;
     int status = 0;
     bool a2dp_reconfig = false;
     struct listnode *node;
