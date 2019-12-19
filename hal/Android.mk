@@ -72,7 +72,7 @@ ifeq ($(TARGET_BOARD_AUTO),true)
   LOCAL_CFLAGS += -DPLATFORM_AUTO
 endif
 
-LOCAL_CFLAGS += -Wno-macro-redefined
+LOCAL_CFLAGS += -Wno-macro-redefined -Wno-unused-parameter
 
 LOCAL_HEADER_LIBRARIES := libhardware_headers
 
@@ -85,7 +85,9 @@ LOCAL_SRC_FILES := \
 
 LOCAL_SRC_FILES += audio_extn/audio_extn.c \
                    audio_extn/utils.c
-LOCAL_HEADER_LIBRARIES += generated_kernel_headers
+LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
+LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/techpack/audio/include
+LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
 
 ifeq ($(strip $(AUDIO_FEATURE_ENABLED_DLKM)),true)
   LOCAL_HEADER_LIBRARIES += audio_kernel_headers
@@ -161,9 +163,6 @@ endif
 
 ifeq ($(strip $(AUDIO_FEATURE_ENABLED_SSR)),true)
     LOCAL_CFLAGS += -DSSR_ENABLED
-    ifeq ($(QCPATH),)
-        LOCAL_CFLAGS += -D_OSS
-    endif
     LOCAL_SRC_FILES += audio_extn/ssr.c
     LOCAL_C_INCLUDES += $(TARGET_OUT_HEADERS)/mm-audio/surround_sound_3mic/
     LOCAL_C_INCLUDES += $(TARGET_OUT_HEADERS)/common/inc/
@@ -218,11 +217,6 @@ ifeq ($(strip $(DS1_DOLBY_DAP)),true)
 ifneq ($(strip $(DOLBY_DDP)),true)
     LOCAL_SRC_FILES += audio_extn/dolby.c
 endif
-endif
-
-ifeq ($(strip $(AUDIO_FEATURE_ENABLED_FLAC_OFFLOAD)),true)
-    LOCAL_CFLAGS += -DFLAC_OFFLOAD_ENABLED
-    LOCAL_CFLAGS += -DCOMPRESS_METADATA_NEEDED
 endif
 
 ifeq ($(strip $(AUDIO_FEATURE_ENABLED_EXTN_FLAC_DECODER)),true)
@@ -353,7 +347,6 @@ LOCAL_C_INCLUDES += \
 	external/tinycompress/include \
 	system/media/audio_utils/include \
 	external/expat/lib \
-	hardware/libhardware/include \
 	$(call include-path-for, audio-route) \
 	$(call include-path-for, audio-effects) \
 	$(LOCAL_PATH)/$(AUDIO_PLATFORM) \
@@ -364,6 +357,11 @@ ifeq ($(strip $(AUDIO_FEATURE_ENABLED_LISTEN)),true)
     LOCAL_CFLAGS += -DAUDIO_LISTEN_ENABLED
     LOCAL_C_INCLUDES += $(TARGET_OUT_HEADERS)/mm-audio/audio-listen
     LOCAL_SRC_FILES += audio_extn/listen.c
+endif
+
+ifeq ($(TARGET_COMPILE_WITH_MSM_KERNEL),true)
+        LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/techpack/audio/include
+        LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
 endif
 
 ifeq ($(strip $(AUDIO_FEATURE_ENABLED_EXT_HDMI)),true)
@@ -457,12 +455,6 @@ ifeq ($(strip $(AUDIO_FEATURE_ELLIPTIC_ULTRASOUND_SUPPORT)),true)
 endif
 
 LOCAL_CFLAGS += -D_GNU_SOURCE
-
-ifneq ($(strip $(AUDIO_FEATURE_ENABLED_EXT_AMPLIFIER)),false)
-    LOCAL_CFLAGS += -DEXT_AMPLIFIER_ENABLED
-    LOCAL_SRC_FILES += audio_extn/audio_amplifier.c
-endif
-
 LOCAL_CFLAGS += -Wall -Werror
 LOCAL_CLANG_CFLAGS += -Wno-unused-variable -Wno-unused-function -Wno-missing-field-initializers
 
