@@ -40,7 +40,6 @@
 
 #include <stdlib.h>
 #include <cutils/list.h>
-#include <hardware/audio_amplifier.h>
 #include <hardware/audio.h>
 #include <tinyalsa/asoundlib.h>
 #include <tinycompress/tinycompress.h>
@@ -539,7 +538,6 @@ struct audio_device {
     struct audio_device_config_param *device_cfg_params;
     unsigned int interactive_usecase_state;
     bool dp_allowed_for_voice;
-    amplifier_device_t *amp;
     void *ext_hw_plugin;
 };
 
