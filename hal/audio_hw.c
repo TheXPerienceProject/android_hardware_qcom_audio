@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2020, The Linux Foundation. All rights reserved.
  * Not a Contribution.
  *
  * Copyright (C) 2013 The Android Open Source Project
@@ -493,6 +493,8 @@ static const struct string_to_enum out_sample_rates_name_to_enum_table[] = {
     STRING_TO_ENUM(96000),
     STRING_TO_ENUM(176400),
     STRING_TO_ENUM(192000),
+    STRING_TO_ENUM(352800),
+    STRING_TO_ENUM(384000),
 };
 
 struct in_effect_list {
@@ -1791,13 +1793,13 @@ static void check_usecases_capture_codec_backend(struct audio_device *adev,
         if (usecase->type != PCM_PLAYBACK &&
                 usecase != uc_info &&
                 (usecase->in_snd_device != snd_device || force_routing) &&
-                ((uc_info->devices & backend_check_cond) &&
+                (((uc_info->devices & backend_check_cond) &&
                  (((usecase->devices & ~AUDIO_DEVICE_BIT_IN) & AUDIO_DEVICE_IN_ALL_CODEC_BACKEND) ||
-                  (usecase->type == VOIP_CALL))) &&
+                  (usecase->type == VOIP_CALL))) ||
                 ((uc_info->type == VOICE_CALL &&
                   usecase->devices == AUDIO_DEVICE_IN_VOICE_CALL) ||
                  platform_check_backends_match(snd_device,\
-                                              usecase->in_snd_device)) &&
+                                              usecase->in_snd_device))) &&
                 (usecase->id != USECASE_AUDIO_SPKR_CALIB_TX)) {
             ALOGV("%s: Usecase (%s) is active on (%s) - disabling ..",
                   __func__, use_case_table[usecase->id],
@@ -8366,21 +8368,6 @@ static int adev_set_parameters(struct audio_hw_device *dev, const char *kvpairs)
                 adev->allow_afe_proxy_usage = true;
             }
         }
-        if (audio_is_a2dp_out_device(device)) {
-           struct audio_usecase *usecase;
-           struct listnode *node;
-           list_for_each(node, &adev->usecase_list) {
-               usecase = node_to_item(node, struct audio_usecase, list);
-               if (PCM_PLAYBACK == usecase->type && usecase->stream.out &&
-                  (usecase->stream.out->flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) &&
-                   usecase->stream.out->a2dp_compress_mute) {
-                   struct stream_out *out = usecase->stream.out;
-                   ALOGD("Unmuting the stream when Bt-A2dp disconnected and stream is mute");
-                   out->a2dp_compress_mute = false;
-                   out_set_compr_volume(&out->stream, out->volume_l, out->volume_r);
-               }
-           }
-        }
     }
 
     audio_extn_hfp_set_parameters(adev, parms);
@@ -9020,6 +9007,7 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
         in->config.rate = config->sample_rate;
         in->af_period_multiplier = 1;
     } else if (in->source == AUDIO_SOURCE_VOICE_COMMUNICATION &&
+               (!voice_extn_is_compress_voip_supported()) &&
                in->flags & AUDIO_INPUT_FLAG_VOIP_TX &&
                (config->sample_rate == 8000 ||
                 config->sample_rate == 16000 ||
@@ -9900,8 +9888,7 @@ static int adev_open(const hw_module_t *module, const char *name,
     audio_device_ref_count++;
 
     int trial;
-    if ((property_get("vendor.audio_hal.period_size", value, NULL) > 0) ||
-        (property_get("audio_hal.period_size", value, NULL) > 0)) {
+    if (property_get("vendor.audio_hal.period_size", value, NULL) > 0) {
         trial = atoi(value);
         if (period_size_is_plausible_for_low_latency(trial)) {
             pcm_config_low_latency.period_size = trial;
@@ -9922,8 +9909,7 @@ static int adev_open(const hw_module_t *module, const char *name,
 
     adev->camera_orientation = CAMERA_DEFAULT;
 
-    if ((property_get("vendor.audio_hal.period_multiplier",value,NULL) > 0) ||
-        (property_get("audio_hal.period_multiplier",value,NULL) > 0)) {
+    if (property_get("vendor.audio_hal.period_multiplier",value,NULL) > 0) {
         af_period_multiplier = atoi(value);
         if (af_period_multiplier < 0)
             af_period_multiplier = 2;
