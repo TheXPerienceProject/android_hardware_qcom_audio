@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2020, The Linux Foundation. All rights reserved.
  * Not a Contribution.
  *
  * Copyright (C) 2013 The Android Open Source Project
@@ -3761,8 +3761,15 @@ int start_output_stream(struct stream_out *out)
             out_set_pcm_volume(&out->stream, out->volume_l, out->volume_r);
         }
     } else {
-        platform_set_stream_channel_map(adev->platform, out->channel_mask,
-                   out->pcm_device_id, &out->channel_map_param.channel_map[0]);
+        /*
+         * set custom channel map if:
+         *   1. neither mono nor stereo clips i.e. channels > 2 OR
+         *   2. custom channel map has been set by client
+         * else default channel map of FC/FR/FL can always be set to DSP
+         */
+        if (popcount(out->channel_mask) > 2 || out->channel_map_param.channel_map[0])
+            platform_set_stream_channel_map(adev->platform, out->channel_mask,
+                       out->pcm_device_id, &out->channel_map_param.channel_map[0]);
         audio_enable_asm_bit_width_enforce_mode(adev->mixer,
                                                 adev->dsp_bit_width_enforce_mode,
                                                 true);
@@ -4452,15 +4459,6 @@ static void out_snd_mon_cb(void * stream, struct str_parms * parms)
     return;
 }
 
-static int get_alive_usb_card(struct str_parms* parms) {
-    int card;
-    if ((str_parms_get_int(parms, "card", &card) >= 0) &&
-        !audio_extn_usb_alive(card)) {
-        return card;
-    }
-    return -ENODEV;
-}
-
 static int out_set_parameters(struct audio_stream *stream, const char *kvpairs)
 {
     struct stream_out *out = (struct stream_out *)stream;
@@ -4510,7 +4508,7 @@ static int out_set_parameters(struct audio_stream *stream, const char *kvpairs)
                 val = AUDIO_DEVICE_OUT_SPEAKER;
         }
         /*
-        * When USB headset is disconnected the music platback paused
+        * When USB headset is disconnected the music playback paused
         * and the policy manager send routing=0. But if the USB is connected
         * back before the standby time, AFE is not closed and opened
         * when USB is connected back. So routing to speker will guarantee
@@ -4518,7 +4516,7 @@ static int out_set_parameters(struct audio_stream *stream, const char *kvpairs)
         */
         if ((out->devices & AUDIO_DEVICE_OUT_ALL_USB) &&
                 (val == AUDIO_DEVICE_NONE) &&
-                 !audio_extn_usb_connected(parms)) {
+                 !audio_extn_usb_connected(NULL)) {
                  val = AUDIO_DEVICE_OUT_SPEAKER;
          }
         /* To avoid a2dp to sco overlapping / BT device improper state
@@ -4549,11 +4547,10 @@ static int out_set_parameters(struct audio_stream *stream, const char *kvpairs)
 
         // Workaround: If routing to an non existing usb device, fail gracefully
         // The routing request will otherwise block during 10 second
-        int card;
-        if (audio_is_usb_out_device(new_dev) &&
-            (card = get_alive_usb_card(parms)) >= 0) {
+        if ((new_dev & AUDIO_DEVICE_OUT_ALL_USB) &&
+            !audio_extn_usb_connected(NULL)) {
 
-            ALOGW("out_set_parameters() ignoring rerouting to non existing USB card %d", card);
+            ALOGW("out_set_parameters() ignoring rerouting to non existing USB card");
             pthread_mutex_unlock(&adev->lock);
             pthread_mutex_unlock(&out->lock);
             ret = -ENOSYS;
@@ -5466,6 +5463,12 @@ static ssize_t out_write(struct audio_stream_out *stream, const void *buffer,
         }
     }
 
+    if ((out->devices & AUDIO_DEVICE_OUT_ALL_USB) &&
+            !audio_extn_usb_connected(NULL)) {
+        ret = -EIO;
+        goto exit;
+    }
+
     if (out->standby) {
         out->standby = false;
         pthread_mutex_lock(&adev->lock);
@@ -6322,9 +6325,6 @@ static int in_standby(struct audio_stream *stream)
             in->pcm = NULL;
         }
 
-        if (in->source == AUDIO_SOURCE_VOICE_COMMUNICATION)
-            adev->enable_voicerx = false;
-
         if (do_stop)
             status = stop_input_stream(in);
 
@@ -6443,11 +6443,9 @@ static int in_set_parameters(struct audio_stream *stream, const char *kvpairs)
 
             // Workaround: If routing to an non existing usb device, fail gracefully
             // The routing request will otherwise block during 10 second
-            int card;
             if (audio_is_usb_in_device(val) &&
-                (card = get_alive_usb_card(parms)) >= 0) {
-
-                ALOGW("in_set_parameters() ignoring rerouting to non existing USB card %d", card);
+                !audio_extn_usb_connected(NULL)) {
+                ALOGW("in_set_parameters() ignoring rerouting to non existing USB");
                 ret = -ENOSYS;
             } else {
 
@@ -8943,6 +8941,7 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
         in->config.rate = config->sample_rate;
         in->af_period_multiplier = 1;
     } else if (in->source == AUDIO_SOURCE_VOICE_COMMUNICATION &&
+               (!voice_extn_is_compress_voip_supported()) &&
                in->flags & AUDIO_INPUT_FLAG_VOIP_TX &&
                (config->sample_rate == 8000 ||
                 config->sample_rate == 16000 ||
@@ -9144,6 +9143,10 @@ static void adev_close_input_stream(struct audio_hw_device *dev,
     pthread_mutex_lock(&adev->lock);
     if (in->usecase == USECASE_AUDIO_RECORD) {
         adev->pcm_record_uc_state = 0;
+    }
+
+    if (in->source == AUDIO_SOURCE_VOICE_COMMUNICATION) {
+        adev->enable_voicerx = false;
     }
 
     if (audio_extn_ssr_get_stream() == in) {
@@ -9660,6 +9663,8 @@ static int adev_open(const hw_module_t *module, const char *name,
     adev->use_old_pspd_mix_ctrl = false;
     adev->adm_routing_changed = false;
 
+    audio_extn_perf_lock_init();
+
     /* Loads platform specific libraries dynamically */
     adev->platform = platform_init(adev);
     if (!adev->platform) {
@@ -9812,8 +9817,7 @@ static int adev_open(const hw_module_t *module, const char *name,
     audio_device_ref_count++;
 
     int trial;
-    if ((property_get("vendor.audio_hal.period_size", value, NULL) > 0) ||
-        (property_get("audio_hal.period_size", value, NULL) > 0)) {
+    if (property_get("vendor.audio_hal.period_size", value, NULL) > 0) {
         trial = atoi(value);
         if (period_size_is_plausible_for_low_latency(trial)) {
             pcm_config_low_latency.period_size = trial;
@@ -9834,8 +9838,7 @@ static int adev_open(const hw_module_t *module, const char *name,
 
     adev->camera_orientation = CAMERA_DEFAULT;
 
-    if ((property_get("vendor.audio_hal.period_multiplier",value,NULL) > 0) ||
-        (property_get("audio_hal.period_multiplier",value,NULL) > 0)) {
+    if (property_get("vendor.audio_hal.period_multiplier",value,NULL) > 0) {
         af_period_multiplier = atoi(value);
         if (af_period_multiplier < 0)
             af_period_multiplier = 2;
@@ -9854,7 +9857,6 @@ static int adev_open(const hw_module_t *module, const char *name,
         adev->adm_data = adev->adm_init();
 
     qahwi_init(*device);
-    audio_extn_perf_lock_init();
     audio_extn_adsp_hdlr_init(adev->mixer);
 
     audio_extn_snd_mon_init();

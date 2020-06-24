@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2020, The Linux Foundation. All rights reserved.
  * Not a Contribution.
  *
  * Copyright (C) 2013 The Android Open Source Project
@@ -71,6 +71,7 @@
 #define PLATFORM_INFO_XML_PATH_I2S "/etc/audio_platform_info_extcodec.xml"
 #define PLATFORM_INFO_XML_PATH_WSA  "/etc/audio_platform_info_wsa.xml"
 #define PLATFORM_INFO_XML_PATH_TDM  "/etc/audio_platform_info_tdm.xml"
+#define PLATFORM_INFO_XML_PATH_PCIE  "/etc/audio_platform_info_pcie.xml"
 #else
 #define PLATFORM_INFO_XML_PATH_INTCODEC  "/vendor/etc/audio_platform_info_intcodec.xml"
 #define PLATFORM_INFO_XML_PATH_SKUSH "/vendor/etc/audio_platform_info_skush.xml"
@@ -82,6 +83,7 @@
 #define PLATFORM_INFO_XML_PATH_I2S "/vendor/etc/audio_platform_info_i2s.xml"
 #define PLATFORM_INFO_XML_PATH_WSA  "/vendor/etc/audio_platform_info_wsa.xml"
 #define PLATFORM_INFO_XML_PATH_TDM  "/vendor/etc/audio_platform_info_tdm.xml"
+#define PLATFORM_INFO_XML_PATH_PCIE  "/vendor/etc/audio_platform_info_pcie.xml"
 #endif
 
 #include <linux/msm_audio.h>
@@ -1855,6 +1857,15 @@ void platform_set_echo_reference(struct audio_device *adev, bool enable,
         else if (out_device & AUDIO_DEVICE_OUT_USB_HEADSET)
             strlcat(ec_ref_mixer_path, " usb-headphones",
                     MIXER_PATH_MAX_LENGTH);
+        else if (adev->snd_dev_ref_cnt[SND_DEVICE_OUT_BT_SCO_WB] > 0)
+            strlcat(ec_ref_mixer_path, " bt-sco-wb",
+                    MIXER_PATH_MAX_LENGTH);
+        else if (adev->snd_dev_ref_cnt[SND_DEVICE_OUT_BT_SCO_SWB] > 0)
+            strlcat(ec_ref_mixer_path, " bt-sco-swb",
+                    MIXER_PATH_MAX_LENGTH);
+        else if (out_device & AUDIO_DEVICE_OUT_ALL_SCO)
+            strlcat(ec_ref_mixer_path, " bt-sco",
+                    MIXER_PATH_MAX_LENGTH);
 
         if (audio_route_apply_and_update_path(adev->audio_route,
                                               ec_ref_mixer_path) == 0)
@@ -2035,6 +2046,8 @@ static bool platform_is_i2s_ext_modem(const char *snd_card_name,
                  sizeof("sdx-tavil-i2s-snd-card")) ||
         !strncmp(snd_card_name, "sda845-tavil-i2s-snd-card",
                  sizeof("sda845-tavil-i2s-snd-card")) ||
+        !strncmp(snd_card_name, "sm8150-hana55-snd-card",
+                 sizeof("sm8150-hana55-snd-card")) ||
         !strncmp(snd_card_name, "sa6155-adp-star-snd-card",
                  sizeof("sa6155-adp-star-snd-card"))) {
         plat_data->is_i2s_ext_modem = true;
@@ -2959,78 +2972,7 @@ void *platform_init(struct audio_device *adev)
         return NULL;
     }
 
-    if (platform_is_i2s_ext_modem(snd_card_name, my_data) &&
-        !is_auto_snd_card(snd_card_name)) {
-        ALOGD("%s: Call MIXER_XML_PATH_I2S", __func__);
-
-        adev->audio_route = audio_route_init(adev->snd_card,
-                                             MIXER_XML_PATH_I2S);
-    } else {
-        /* Get the codec internal name from the sound card name
-         * and form the mixer paths file name dynamically. This
-         * is generic way of picking any codec name based mixer
-         * files in future with no code change. This code
-         * assumes mixer files are formed with format as
-         * mixer_paths_internalcodecname.xml
-
-         * If this dynamically read mixer files fails to open then it
-         * falls back to default mixer file i.e mixer_paths.xml. This is
-         * done to preserve backward compatibility but not mandatory as
-         * long as the mixer files are named as per above assumption.
-        */
-        snprintf(mixer_xml_file, sizeof(mixer_xml_file), "%s_%s_%s.xml",
-                         MIXER_XML_BASE_STRING, snd_split_handle->snd_card,
-                         snd_split_handle->form_factor);
-        if (!audio_extn_utils_resolve_config_file(mixer_xml_file)) {
-            memset(mixer_xml_file, 0, sizeof(mixer_xml_file));
-            snprintf(mixer_xml_file, sizeof(mixer_xml_file), "%s_%s.xml",
-                         MIXER_XML_BASE_STRING, snd_split_handle->variant);
-
-            if (!audio_extn_utils_resolve_config_file(mixer_xml_file)) {
-                memset(mixer_xml_file, 0, sizeof(mixer_xml_file));
-                snprintf(mixer_xml_file, sizeof(mixer_xml_file), "%s_%s.xml",
-                             MIXER_XML_BASE_STRING, snd_split_handle->snd_card);
-
-                if (!audio_extn_utils_resolve_config_file(mixer_xml_file)) {
-                    memset(mixer_xml_file, 0, sizeof(mixer_xml_file));
-                    strlcpy(mixer_xml_file, MIXER_XML_DEFAULT_PATH, MIXER_PATH_MAX_LENGTH);
-                    audio_extn_utils_resolve_config_file(mixer_xml_file);
-                }
-            }
-        }
-
-        ALOGD("%s: Loading mixer file: %s", __func__, mixer_xml_file);
-        if (audio_extn_read_xml(adev, adev->snd_card, mixer_xml_file,
-                                MIXER_XML_PATH_AUXPCM) == -ENOSYS) {
-            adev->audio_route = audio_route_init(adev->snd_card, mixer_xml_file);
-            update_codec_type_and_interface(my_data, snd_card_name);
-        }
-    }
-
-#if defined (PLATFORM_MSMFALCON) || defined (PLATFORM_MSM8937)
-         if (my_data->is_internal_codec == true) {
-            msm_device_to_be_id = msm_device_to_be_id_internal_codec;
-            msm_be_id_array_len  =
-                sizeof(msm_device_to_be_id_internal_codec) /
-                sizeof(msm_device_to_be_id_internal_codec[0]);
-         } else {
-            msm_device_to_be_id = msm_device_to_be_id_external_codec;
-            msm_be_id_array_len  =
-                sizeof(msm_device_to_be_id_external_codec) /
-                sizeof(msm_device_to_be_id_external_codec[0]);
-         }
-#endif
-
-    if (!adev->audio_route) {
-        ALOGE("%s: Failed to init audio route controls, aborting.",
-               __func__);
-        if (my_data)
-            free(my_data);
-        if (snd_card_name)
-            free(snd_card_name);
-        audio_extn_utils_close_snd_mixer(adev->mixer);
-        return NULL;
-    }
+    update_codec_type_and_interface(my_data, snd_card_name);
 
     adev->dp_allowed_for_voice =
         property_get_bool("vendor.audio.enable.dp.for.voice", false);
@@ -3079,10 +3021,8 @@ void *platform_init(struct audio_device *adev)
         my_data->fluence_sb_enabled = true;
 
     my_data->fluence_type = FLUENCE_NONE;
-    if ((property_get("ro.vendor.audio.sdk.fluencetype",
-                      my_data->fluence_cap, NULL) > 0) ||
-        (property_get("ro.qc.sdk.audio.fluencetype",
-                      my_data->fluence_cap, NULL) > 0)) {
+    if (property_get("ro.vendor.audio.sdk.fluencetype",
+                      my_data->fluence_cap, NULL) > 0) {
         if (!strncmp("fluencepro", my_data->fluence_cap, sizeof("fluencepro"))) {
             my_data->fluence_type = FLUENCE_QUAD_MIC | FLUENCE_DUAL_MIC;
 
@@ -3100,21 +3040,19 @@ void *platform_init(struct audio_device *adev)
     }
 
     if (my_data->fluence_type != FLUENCE_NONE) {
-        if ((property_get("persist.vendor.audio.fluence.voicecall",
-                          value,NULL) > 0) ||
-            (property_get("persist.audio.fluence.voicecall",value,NULL) > 0)) {
+        if (property_get("persist.vendor.audio.fluence.voicecall",
+                          value,NULL) > 0) {
             if (!strncmp("true", value, sizeof("true")))
                 my_data->fluence_in_voice_call = true;
         }
 
-        if ((property_get("persist.vendor.audio.fluence.voicerec",
-                          value,NULL) > 0) ||
-            (property_get("persist.audio.fluence.voicerec",value,NULL) > 0)) {
+        if (property_get("persist.vendor.audio.fluence.voicerec",
+                          value,NULL) > 0) {
             if (!strncmp("true", value, sizeof("true")))
                 my_data->fluence_in_voice_rec = true;
         }
 
-        property_get("persist.audio.fluence.voicecomm",value,"");
+        property_get("persist.vendor.audio.fluence.voicecomm",value,"");
         if (!strncmp("true", value, sizeof("true"))) {
             my_data->fluence_in_voice_comm = true;
         }
@@ -3124,9 +3062,8 @@ void *platform_init(struct audio_device *adev)
             my_data->fluence_in_audio_rec = true;
         }
 
-        if ((property_get("persist.vendor.audio.fluence.speaker",
-                          value,NULL) > 0) ||
-            (property_get("persist.audio.fluence.speaker",value,NULL) > 0)) {
+        if (property_get("persist.vendor.audio.fluence.speaker",
+                          value,NULL) > 0) {
             if (!strncmp("true", value, sizeof("true"))) {
                 my_data->fluence_in_spkr_mode = true;
             }
@@ -3226,6 +3163,9 @@ void *platform_init(struct audio_device *adev)
     else if (!strncmp(snd_card_name, "qcs405-tdm-snd-card",
                sizeof("qcs405-tdm-snd-card")))
         platform_info_init(PLATFORM_INFO_XML_PATH_TDM, my_data, PLATFORM);
+    else if (!strncmp(snd_card_name, "sm8150-pcie-snd-card",
+               sizeof("sm8150-pcie-snd-card")))
+        platform_info_init(PLATFORM_INFO_XML_PATH_PCIE, my_data, PLATFORM);
     else if (my_data->is_internal_codec)
         platform_info_init(PLATFORM_INFO_XML_PATH_INTCODEC, my_data, PLATFORM);
     else {
@@ -3233,6 +3173,82 @@ void *platform_init(struct audio_device *adev)
         audio_extn_utils_get_platform_info(snd_card_name, platform_info_file);
         platform_info_init(platform_info_file, my_data, PLATFORM);
     }
+
+    // acquire perf lock to reduce the time for audio route init
+    audio_extn_perf_lock_acquire(&adev->perf_lock_handle, 0,
+                                 adev->perf_lock_opts,
+                                 adev->perf_lock_opts_size);
+    if (platform_is_i2s_ext_modem(snd_card_name, my_data) &&
+        !is_auto_snd_card(snd_card_name)) {
+        ALOGD("%s: Call MIXER_XML_PATH_I2S", __func__);
+
+        adev->audio_route = audio_route_init(adev->snd_card,
+                                             MIXER_XML_PATH_I2S);
+    } else {
+        /* Get the codec internal name from the sound card name
+         * and form the mixer paths file name dynamically. This
+         * is generic way of picking any codec name based mixer
+         * files in future with no code change. This code
+         * assumes mixer files are formed with format as
+         * mixer_paths_internalcodecname.xml
+
+         * If this dynamically read mixer files fails to open then it
+         * falls back to default mixer file i.e mixer_paths.xml. This is
+         * done to preserve backward compatibility but not mandatory as
+         * long as the mixer files are named as per above assumption.
+        */
+        snprintf(mixer_xml_file, sizeof(mixer_xml_file), "%s_%s_%s.xml",
+                         MIXER_XML_BASE_STRING, snd_split_handle->snd_card,
+                         snd_split_handle->form_factor);
+        if (!audio_extn_utils_resolve_config_file(mixer_xml_file)) {
+            memset(mixer_xml_file, 0, sizeof(mixer_xml_file));
+            snprintf(mixer_xml_file, sizeof(mixer_xml_file), "%s_%s.xml",
+                         MIXER_XML_BASE_STRING, snd_split_handle->variant);
+
+            if (!audio_extn_utils_resolve_config_file(mixer_xml_file)) {
+                memset(mixer_xml_file, 0, sizeof(mixer_xml_file));
+                snprintf(mixer_xml_file, sizeof(mixer_xml_file), "%s_%s.xml",
+                             MIXER_XML_BASE_STRING, snd_split_handle->snd_card);
+
+                if (!audio_extn_utils_resolve_config_file(mixer_xml_file)) {
+                    memset(mixer_xml_file, 0, sizeof(mixer_xml_file));
+                    strlcpy(mixer_xml_file, MIXER_XML_DEFAULT_PATH, MIXER_PATH_MAX_LENGTH);
+                    audio_extn_utils_resolve_config_file(mixer_xml_file);
+                }
+            }
+        }
+
+        ALOGD("%s: Loading mixer file: %s", __func__, mixer_xml_file);
+        if (audio_extn_read_xml(adev, adev->snd_card, mixer_xml_file,
+                                MIXER_XML_PATH_AUXPCM) == -ENOSYS)
+            adev->audio_route = audio_route_init(adev->snd_card, mixer_xml_file);
+    }
+    audio_extn_perf_lock_release(&adev->perf_lock_handle);
+
+    if (!adev->audio_route) {
+        ALOGE("%s: Failed to init audio route controls, aborting.",
+               __func__);
+        if (my_data)
+            free(my_data);
+        if (snd_card_name)
+            free(snd_card_name);
+        audio_extn_utils_close_snd_mixer(adev->mixer);
+        return NULL;
+    }
+
+#if defined (PLATFORM_MSMFALCON) || defined (PLATFORM_MSM8937)
+         if (my_data->is_internal_codec == true) {
+            msm_device_to_be_id = msm_device_to_be_id_internal_codec;
+            msm_be_id_array_len  =
+                sizeof(msm_device_to_be_id_internal_codec) /
+                sizeof(msm_device_to_be_id_internal_codec[0]);
+         } else {
+            msm_device_to_be_id = msm_device_to_be_id_external_codec;
+            msm_be_id_array_len  =
+                sizeof(msm_device_to_be_id_external_codec) /
+                sizeof(msm_device_to_be_id_external_codec[0]);
+         }
+#endif
 
     /* CSRA devices support multiple sample rates via I2S at spkr out */
     if (!strncmp(snd_card_name, "qcs405-csra", strlen("qcs405-csra"))) {
@@ -3406,6 +3422,10 @@ acdb_init_fail:
     if ((!strncmp("apq8084", platform, sizeof("apq8084")) ||
         !strncmp("msm8996", platform, sizeof("msm8996")) ||
         !strncmp("sm6150", platform, sizeof("sm6150")) ||
+        (!strncmp("msmnile", platform, sizeof("msmnile")) &&
+         !strncmp("sm8150-hana55-snd-card", snd_card_name, sizeof("sm8150-hana55-snd-card"))) ||
+        (!strncmp("msmnile", platform, sizeof("msmnile")) &&
+         !strncmp("sm8150-pcie-snd-card", snd_card_name, sizeof("sm8150-pcie-snd-card"))) ||
         !strncmp("sdx", platform, sizeof("sdx")) ||
         !strncmp("sdm845", platform, sizeof("sdm845"))) &&
         ( !strncmp("mdm", baseband, (sizeof("mdm")-1)) ||
@@ -8750,8 +8770,11 @@ static bool platform_check_codec_backend_cfg(struct audio_device* adev,
             ALOGD("%s:becf: afe: napb not active - set non fractional rate",
                        __func__);
         }
-        /*reset sample rate to 48khz if sample rate less than 44.1khz, or device backend dose not support 44.1 khz*/
-        if ((sample_rate == OUTPUT_SAMPLING_RATE_44100 &&
+        /*
+         * reset sample rate to 48khz if sample rate less than 44.1khz, or device backend does not
+         * support 44.1 khz and the multiple of 44.1khz
+         */
+        if ((sample_rate % OUTPUT_SAMPLING_RATE_44100 == 0 &&
              backend_idx != HEADPHONE_44_1_BACKEND &&
              backend_idx != HEADPHONE_BACKEND &&
              backend_idx != USB_AUDIO_RX_BACKEND) ||
