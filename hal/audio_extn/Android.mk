@@ -918,7 +918,7 @@ LOCAL_MODULE := libautohal
 
 LOCAL_VENDOR_MODULE := true
 
-PRIMARY_HAL_PATH := vendor/qcom/opensource/audio-hal/primary-hal/hal
+PRIMARY_HAL_PATH := hardware/qcom-caf/sm8150/audio/hal
 AUDIO_PLATFORM := $(TARGET_BOARD_PLATFORM)
 
 ifneq ($(filter sdm845 sdm710 sdmshrike msmnile kona lahaina holi lito atoll bengal sdm660 msm8937 msm8953 msm8998 $(MSMSTEPPE) $(TRINKET),$(TARGET_BOARD_PLATFORM)),)
