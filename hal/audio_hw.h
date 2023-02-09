@@ -911,7 +911,6 @@ size_t get_output_period_size(uint32_t sample_rate,
 #define CHECK(condition) LOG_ALWAYS_FATAL_IF(!(condition), "%s",\
             __FILE__ ":" LITERAL_TO_STRING(__LINE__)\
             " ASSERT_FATAL(" #condition ") failed.")
-bool is_combo_audio_input_device(struct listnode *devices);
 
 static inline bool is_loopback_input_device(audio_devices_t device) {
     if (!audio_is_output_device(device) &&
@@ -949,5 +948,30 @@ audio_patch_handle_t generate_patch_handle();
  * stream_in or stream_out mutex first, followed by the audio_device mutex
  * and latch at last.
  */
+
+static inline audio_format_t pcm_format_to_audio_format(const enum pcm_format format)
+{
+   audio_format_t ret = AUDIO_FORMAT_INVALID;
+   switch(format) {
+        case PCM_FORMAT_S16_LE:
+            ret = (audio_format_t)AUDIO_FORMAT_PCM_SUB_16_BIT;
+            break;
+        case PCM_FORMAT_S32_LE:
+           ret = (audio_format_t)AUDIO_FORMAT_PCM_SUB_32_BIT;
+           break;
+        case PCM_FORMAT_S8:
+           ret = (audio_format_t)AUDIO_FORMAT_PCM_SUB_8_BIT;
+           break;
+        case PCM_FORMAT_S24_LE:
+           ret = (audio_format_t)AUDIO_FORMAT_PCM_SUB_8_24_BIT;
+           break;
+        case PCM_FORMAT_S24_3LE:
+           ret = (audio_format_t)AUDIO_FORMAT_PCM_SUB_24_BIT_PACKED;
+           break;
+        default:
+           break;
+      }
+      return ret;
+}
 
 #endif // QCOM_AUDIO_HW_H
