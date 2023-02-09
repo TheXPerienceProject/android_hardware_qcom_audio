@@ -717,11 +717,17 @@ static void register_out_stream(struct stream_out *out)
 
     if (!adev->adm_set_config)
         return;
-
+#ifdef PLATFORM_AUTO
     if (out->realtime || (out->flags & AUDIO_OUTPUT_FLAG_SYS_NOTIFICATION))
        adev->adm_set_config(adev->adm_data,
                              out->handle,
                              out->pcm, &out->config);
+#else
+    if (out->realtime)
+       adev->adm_set_config(adev->adm_data,
+                             out->handle,
+                             out->pcm, &out->config);
+#endif
 }
 
 static void register_in_stream(struct stream_in *in)
@@ -1909,6 +1915,7 @@ static snd_device_t derive_playback_snd_device(void * platform,
 
     snd_device_t d1 = uc->out_snd_device;
     snd_device_t d2 = new_snd_device;
+    snd_device_t ret = 0;
 
     list_init(&a1);
     list_init(&a2);
@@ -1939,28 +1946,39 @@ static snd_device_t derive_playback_snd_device(void * platform,
                       __func__,
                       list_length(&a1) > 1 ? d1 : d2);
             }
+            ret = d2;
             goto end;
         }
 
         if (platform_check_backends_match(d3[0], d3[1])) {
-            return d2; // case 5
+            ret = d2;
+            goto end; // case 5
         } else {
             if ((list_length(&a1) > 1) && (list_length(&a2) > 1) &&
-                 platform_check_backends_match(d1, d2))
-                return d2; //case 9
-            if (list_length(&a1) > 1)
-                return d1; //case 7
+                 platform_check_backends_match(d1, d2)) {
+                    ret = d2;
+                    goto end; //case 9
+                 }
+            if (list_length(&a1) > 1) {
+                ret = d1;
+                goto end; //case 7
+            }
             // check if d1 is related to any of d3's
-            if (d1 == d3[0] || d1 == d3[1])
-                return d1; // case 1
-            else
-                return d3[1]; // case 8
+            if (d1 == d3[0] || d1 == d3[1]) {
+                ret = d1;
+                goto end; // case 1
+            } else {
+                 ret = d3[1];
+                goto end; // case 8
+            }
         }
     } else {
         if (platform_check_backends_match(d1, d2)) {
-            return d2; // case 2, 4
+           ret = d2;
+           goto end; // case 2, 4
         } else {
-            return d1; // case 6, 3
+            ret = d1;
+            goto end; // case 6, 3
         }
     }
 
@@ -1968,7 +1986,9 @@ static snd_device_t derive_playback_snd_device(void * platform,
     clear_devices(&a2);
 
 end:
-    return d2; // return whatever was calculated before.
+    clear_devices(&a1);
+    clear_devices(&a2);
+    return ret; // return whatever was calculated before.
 }
 
 static void check_usecases_codec_backend(struct audio_device *adev,
@@ -3275,11 +3295,15 @@ int select_devices(struct audio_device *adev, audio_usecase_t uc_id)
                      !audio_is_true_native_stream_active(adev)) &&
                     usecase->stream.out->sample_rate == OUTPUT_SAMPLING_RATE_44100) ||
                     (usecase->stream.out->sample_rate < OUTPUT_SAMPLING_RATE_44100)) {
+#ifdef PLATFORM_AUTO
             if (!(compare_device_type(&usecase->device_list, AUDIO_DEVICE_OUT_BUS) && ((usecase->stream.out->flags &
                 (audio_output_flags_t)AUDIO_OUTPUT_FLAG_SYS_NOTIFICATION) || (usecase->stream.out->flags &
                 (audio_output_flags_t)AUDIO_OUTPUT_FLAG_PHONE)))) {
                 usecase->stream.out->app_type_cfg.sample_rate = DEFAULT_OUTPUT_SAMPLING_RATE;
             }
+#else
+                usecase->stream.out->app_type_cfg.sample_rate = DEFAULT_OUTPUT_SAMPLING_RATE;
+#endif
         }
     }
     enable_audio_route(adev, usecase);
@@ -4702,6 +4726,9 @@ static size_t get_stream_buffer_size(size_t duration_ms,
 
     size = (sample_rate * duration_ms) / 1000;
     if (is_low_latency){
+#ifndef PLATFORM_AUTO
+         size = configured_low_latency_capture_period_size;
+#else
         switch(sample_rate) {
             case 48000:
                 size = 240;
@@ -4721,6 +4748,7 @@ static size_t get_stream_buffer_size(size_t duration_ms,
             default:
                 size = 240;
         }
+#endif
     }
 
     bytes_per_period_sample = audio_bytes_per_sample(format) * channel_count;
@@ -9948,7 +9976,7 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
             goto err_open;
         }
     }
-
+#ifdef PLATFORM_AUTO
     if ((config->sample_rate == 48000 ||
         config->sample_rate == 32000 ||
         config->sample_rate == 24000 ||
@@ -9956,7 +9984,14 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
         config->sample_rate == 8000)&&
             (flags & AUDIO_INPUT_FLAG_TIMESTAMP) == 0 &&
             (flags & AUDIO_INPUT_FLAG_COMPRESS) == 0 &&
-            (flags & AUDIO_INPUT_FLAG_FAST) != 0) {
+            (flags & AUDIO_INPUT_FLAG_FAST) != 0)
+#else
+    if (config->sample_rate == LOW_LATENCY_CAPTURE_SAMPLE_RATE &&
+            (flags & AUDIO_INPUT_FLAG_TIMESTAMP) == 0 &&
+            (flags & AUDIO_INPUT_FLAG_COMPRESS) == 0 &&
+            (flags & AUDIO_INPUT_FLAG_FAST) != 0)
+#endif
+{
         is_low_latency = true;
 #if LOW_LATENCY_CAPTURE_USE_CASE
         if ((flags & AUDIO_INPUT_FLAG_VOIP_TX) != 0)
@@ -9977,6 +10012,7 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
             in->af_period_multiplier = 1;
         } else {
             // period size is left untouched for rt mode playback
+#ifdef PLATFORM_AUTO
             switch(config->sample_rate)
             {
                 case 48000:
@@ -9997,6 +10033,9 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
                 default:
                     in->config = pcm_config_audio_capture_rt_48KHz;
             }
+#else
+            in->config = pcm_config_audio_capture_rt_48KHz;
+#endif
             in->af_period_multiplier = af_period_multiplier;
         }
     }
@@ -10090,6 +10129,7 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
         in->config.rate = config->sample_rate;
         in->af_period_multiplier = 1;
     } else if (in->realtime) {
+#ifdef PLATFORM_AUTO
         switch(config->sample_rate)
         {
             case 48000:
@@ -10112,7 +10152,10 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
         }
         in->config.format = pcm_format_from_audio_format(config->format);
         in->af_period_multiplier = af_period_multiplier;
-    } else {
+#else
+        in->config = pcm_config_audio_capture_rt_48KHz;
+#endif
+} else {
         int ret_val;
         pthread_mutex_lock(&adev->lock);
         ret_val = audio_extn_check_and_set_multichannel_usecase(adev,
