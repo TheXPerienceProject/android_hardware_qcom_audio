@@ -103,6 +103,8 @@ PRODUCT_PACKAGES += $(AUDIO_HARDWARE)
 PRODUCT_PACKAGES += $(AUDIO_WRAPPER)
 PRODUCT_PACKAGES += $(AUDIO_HAL_TEST_APPS)
 
+ifneq ($(TARGET_DEVICE), alioth)
+$(warning "Disable KERNEL_MODULES_OUT call for dlkm this breaks the build due to we have modules inside kernel")
 ifeq ($(AUDIO_FEATURE_ENABLED_DLKM),true)
 BOARD_VENDOR_KERNEL_MODULES := \
     $(KERNEL_MODULES_OUT)/audio_apr.ko \
@@ -137,6 +139,7 @@ endif
 BOARD_VENDOR_KERNEL_MODULES += \
     $(KERNEL_MODULES_OUT)/qca_cld3_wlan.ko
 
+
 #Audio DLKM
 AUDIO_DLKM := audio_apr.ko
 AUDIO_DLKM += audio_q6_pdr.ko
@@ -166,6 +169,7 @@ AUDIO_DLKM += audio_machine_kona.ko
 AUDIO_DLKM += audio_snd_event.ko
 
 PRODUCT_PACKAGES += $(AUDIO_DLKM)
+endif
 
 PRODUCT_COPY_FILES += \
     hardware/qcom-caf/sm8250/audio/configs/kona/audio_io_policy.conf:$(TARGET_COPY_OUT_VENDOR)/etc/audio_io_policy.conf \
