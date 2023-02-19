@@ -167,11 +167,6 @@ AUDIO_DLKM += audio_snd_event.ko
 
 PRODUCT_PACKAGES += $(AUDIO_DLKM)
 
-ifneq ($(strip $(TARGET_USES_RRO)), true)
-#Audio Specific device overlays
-DEVICE_PACKAGE_OVERLAYS += hardware/qcom-caf/sm8250/audio/configs/common/overlay
-endif
-
 PRODUCT_COPY_FILES += \
     hardware/qcom-caf/sm8250/audio/configs/kona/audio_io_policy.conf:$(TARGET_COPY_OUT_VENDOR)/etc/audio_io_policy.conf \
     hardware/qcom-caf/sm8250/audio/configs/kona/audio_effects.conf:$(TARGET_COPY_OUT_VENDOR)/etc/audio_effects.conf \
