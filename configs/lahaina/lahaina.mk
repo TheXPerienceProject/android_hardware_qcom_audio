@@ -330,9 +330,12 @@ PRODUCT_VENDOR_PROPERTIES += \
 vendor.audio.offload.multiaac.enable=true
 
 #Enable DS2, Hardbypass feature for Dolby
+ifneq ($(TARGET_USES_DOLBY_DS2), true)
+$(warning "DS2 disabled")
 PRODUCT_VENDOR_PROPERTIES += \
 vendor.audio.dolby.ds2.enabled=false\
 vendor.audio.dolby.ds2.hardbypass=false
+endif
 
 #Disable Multiple offload sesison
 PRODUCT_VENDOR_PROPERTIES += \
